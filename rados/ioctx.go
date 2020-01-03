@@ -241,22 +241,20 @@ type ObjectListFunc func(oid string)
 // RadosAllNamespaces before calling this function to return objects from all
 // namespaces
 func (ioctx *IOContext) ListObjects(listFn ObjectListFunc) error {
-	var ctx C.rados_list_ctx_t
-	ret := C.rados_nobjects_list_open(ioctx.ioctx, &ctx)
-	if ret < 0 {
-		return GetRadosError(int(ret))
+	iter, err := NewObjectsIter(ioctx)
+	if err != nil {
+		return err
 	}
-	defer func() { C.rados_nobjects_list_close(ctx) }()
+	defer iter.Close()
 
 	for {
-		var c_entry *C.char
-		ret := C.rados_nobjects_list_next(ctx, &c_entry, nil, nil)
-		if ret == -C.ENOENT {
+		entry, err := iter.Next()
+		if err == RadosErrorNotFound {
 			return nil
-		} else if ret < 0 {
-			return GetRadosError(int(ret))
+		} else if err != nil {
+			return err
 		}
-		listFn(C.GoString(c_entry))
+		listFn(entry.Entry)
 	}
 }
 
