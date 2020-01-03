@@ -73,7 +73,6 @@ func (iter *ObjectsIter) Close() {
 
 // SendAll sends all objects and errors that can be read from the iterator to
 // the channels passed to the function.
-
 func (iter *ObjectsIter) SendAll(results chan<- *ObjectsIterEntry, errs chan<- error) {
 	for {
 		entry, err := iter.Next()
