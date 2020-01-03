@@ -64,6 +64,7 @@ func (iter *ObjectsIter) Close() {
 		return
 	}
 	C.rados_nobjects_list_close(iter.ctx)
+	iter.isOpen = false
 }
 
 type Iter struct {
