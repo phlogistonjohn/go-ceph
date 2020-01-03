@@ -6,6 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func writeDummyObject(suite *RadosTestSuite, ioctx *IOContext, v string) string {
+	oid := suite.GenObjectName()
+	err := ioctx.Write(oid, []byte(v), 0)
+	assert.NoError(suite.T(), err)
+	return oid
+}
+
 func (suite *RadosTestSuite) TestObjectIterator() {
 	suite.SetupConnection()
 
@@ -22,18 +29,13 @@ func (suite *RadosTestSuite) TestObjectIterator() {
 	// create an object in a different namespace to verify that
 	// iteration within a namespace does not return it
 	suite.ioctx.SetNamespace("ns1")
-	bytes_in := []byte("input data")
-	err = suite.ioctx.Write(suite.GenObjectName(), bytes_in, 0)
-	assert.NoError(suite.T(), err)
+	writeDummyObject(suite, suite.ioctx, "input data")
 
 	// create some objects in default namespace
 	suite.ioctx.SetNamespace("")
 	createdList := []string{}
 	for i := 0; i < 10; i++ {
-		oid := suite.GenObjectName()
-		bytes_in := []byte("input data")
-		err = suite.ioctx.Write(oid, bytes_in, 0)
-		assert.NoError(suite.T(), err)
+		oid := writeDummyObject(suite, suite.ioctx, "input data")
 		createdList = append(createdList, oid)
 	}
 
@@ -81,10 +83,7 @@ func (suite *RadosTestSuite) TestObjectIteratorAcrossNamespaces() {
 	createdList := []string{}
 	suite.ioctx.SetNamespace("nsX")
 	for i := 0; i < 10; i++ {
-		oid := suite.GenObjectName()
-		bytes_in := []byte("input data")
-		err = suite.ioctx.Write(oid, bytes_in, 0)
-		assert.NoError(suite.T(), err)
+		oid := writeDummyObject(suite, suite.ioctx, "input data")
 		createdList = append(createdList, oid)
 	}
 	assert.True(suite.T(), len(createdList) == 10)
@@ -92,10 +91,7 @@ func (suite *RadosTestSuite) TestObjectIteratorAcrossNamespaces() {
 	// create some new objects in namespace: nsY
 	suite.ioctx.SetNamespace("nsY")
 	for i := 0; i < 10; i++ {
-		oid := suite.GenObjectName()
-		bytes_in := []byte("input data")
-		err = suite.ioctx.Write(oid, bytes_in, 0)
-		assert.NoError(suite.T(), err)
+		oid := writeDummyObject(suite, suite.ioctx, "input data")
 		createdList = append(createdList, oid)
 	}
 	assert.True(suite.T(), len(createdList) == 20)
