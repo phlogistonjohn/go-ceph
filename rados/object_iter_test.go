@@ -311,3 +311,41 @@ func (suite *RadosTestSuite) TestObjectsIterSendAll() {
 	sort.Strings(names1)
 	assert.Equal(suite.T(), created, names1)
 }
+
+func (suite *RadosTestSuite) TestObjectsIterSendAllStopEarly() {
+	suite.SetupConnection()
+
+	suite.ioctx.SetNamespace("test-ns-1")
+	created := []string{}
+	for i := 0; i < 10; i++ {
+		oid := writeDummyObject(
+			suite, suite.ioctx, fmt.Sprintf("input data %d", i))
+		created = append(created, oid)
+	}
+	defer cleanObjects(suite, "test-ns-1", created)
+
+	oiter, err := NewObjectsIter(suite.ioctx)
+	assert.NoError(suite.T(), err)
+
+	names1 := []string{}
+	entryChan := make(chan *ObjectsIterEntry, 1)
+	errChan := make(chan error, 1)
+	go oiter.SendAll(entryChan, errChan)
+	for entry := range entryChan {
+		names1 = append(names1, entry.Entry)
+		assert.Equal(suite.T(), "test-ns-1", entry.Namespace)
+		if len(names1) >= 5 {
+			break
+		}
+	}
+	oiter.Close()
+	err = <-errChan
+
+	assert.NoError(suite.T(), err)
+	assert.Equal(suite.T(), 5, len(names1))
+	// assert that the 5 items we found during our iteration are in the created
+	// slice
+	for _, n := range names1 {
+		assert.Contains(suite.T(), created, n)
+	}
+}
