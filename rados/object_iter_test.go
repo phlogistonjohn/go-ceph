@@ -13,6 +13,14 @@ func writeDummyObject(suite *RadosTestSuite, ioctx *IOContext, v string) string 
 	return oid
 }
 
+func cleanObjects(suite *RadosTestSuite, ns string, toDelete []string) {
+	suite.ioctx.SetNamespace(ns)
+	for _, oid := range toDelete {
+		err := suite.ioctx.Delete(oid)
+		assert.NoError(suite.T(), err)
+	}
+}
+
 func (suite *RadosTestSuite) TestObjectIterator() {
 	suite.SetupConnection()
 
@@ -38,6 +46,7 @@ func (suite *RadosTestSuite) TestObjectIterator() {
 		oid := writeDummyObject(suite, suite.ioctx, "input data")
 		createdList = append(createdList, oid)
 	}
+	defer cleanObjects(suite, "", createdList)
 
 	// prev list plus new oids
 	expectedObjectList := prevObjectList
@@ -78,21 +87,28 @@ func (suite *RadosTestSuite) TestObjectIteratorAcrossNamespaces() {
 	assert.NoError(suite.T(), iter.Err())
 
 	// create some new objects in namespace: nsX
-	createdList := []string{}
+	nsXObjects := []string{}
 	suite.ioctx.SetNamespace("nsX")
 	for i := 0; i < 10; i++ {
 		oid := writeDummyObject(suite, suite.ioctx, "input data")
-		createdList = append(createdList, oid)
+		nsXObjects = append(nsXObjects, oid)
 	}
-	assert.True(suite.T(), len(createdList) == 10)
+	defer cleanObjects(suite, "nsX", nsXObjects)
+	assert.Equal(suite.T(), 10, len(nsXObjects))
 
 	// create some new objects in namespace: nsY
+	nsYObjects := []string{}
 	suite.ioctx.SetNamespace("nsY")
 	for i := 0; i < 10; i++ {
 		oid := writeDummyObject(suite, suite.ioctx, "input data")
-		createdList = append(createdList, oid)
+		nsYObjects = append(nsYObjects, oid)
 	}
-	assert.True(suite.T(), len(createdList) == 20)
+	defer cleanObjects(suite, "nsY", nsYObjects)
+	assert.Equal(suite.T(), 10, len(nsYObjects))
+
+	createdList := []string{}
+	createdList = append(createdList, nsXObjects...)
+	createdList = append(createdList, nsYObjects...)
 
 	suite.ioctx.SetNamespace(RadosAllNamespaces)
 	iter, err = suite.ioctx.Iter()
