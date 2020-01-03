@@ -45,6 +45,9 @@ func (iter *ObjectsIter) Seek(token IterToken) {
 // Next fetches the next object entry in the pool.
 // When the iterator is exhausted error will be set to RadosErrorNotFound.
 func (iter *ObjectsIter) Next() (*ObjectsIterEntry, error) {
+	if !iter.isOpen {
+		return nil, RadosErrorNotFound
+	}
 	var cEntry, cKey, cNamespace *C.char
 	err := C.rados_nobjects_list_next(iter.ctx, &cEntry, &cKey, &cNamespace)
 	if err != 0 {
