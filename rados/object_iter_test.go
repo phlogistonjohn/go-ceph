@@ -267,3 +267,14 @@ func (suite *RadosTestSuite) TestObjectsIterSeekToken() {
 	assert.Equal(suite.T(), 10, len(names2))
 	assert.Equal(suite.T(), names1, names2)
 }
+
+func (suite *RadosTestSuite) TestObjectsIterMultipleClose() {
+	suite.SetupConnection()
+
+	oiter, err := NewObjectsIter(suite.ioctx)
+	assert.NoError(suite.T(), err)
+	assert.NotNil(suite.T(), oiter)
+
+	oiter.Close()
+	oiter.Close()
+}
