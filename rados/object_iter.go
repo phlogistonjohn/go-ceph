@@ -62,6 +62,7 @@ func (iter *ObjectsIter) Next() (*ObjectsIterEntry, error) {
 
 // Close the iterator context.
 // Iterators are not closed automatically at the end of iteration.
+// It is safe to call Close multiple times on the same ObjectsIter.
 func (iter *ObjectsIter) Close() {
 	if !iter.isOpen {
 		return
