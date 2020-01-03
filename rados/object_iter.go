@@ -67,7 +67,7 @@ func (iter *ObjectsIter) Close() {
 	iter.isOpen = false
 }
 
-func (iter *ObjectsIter) SendAll(results chan *ObjectsIterEntry, errs chan error) {
+func (iter *ObjectsIter) SendAll(results chan<- *ObjectsIterEntry, errs chan<- error) {
 	for {
 		entry, err := iter.Next()
 		switch {
