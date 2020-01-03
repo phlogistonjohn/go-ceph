@@ -278,3 +278,36 @@ func (suite *RadosTestSuite) TestObjectsIterMultipleClose() {
 	oiter.Close()
 	oiter.Close()
 }
+
+func (suite *RadosTestSuite) TestObjectsIterSendAll() {
+	suite.SetupConnection()
+
+	suite.ioctx.SetNamespace("test-ns-1")
+	created := []string{}
+	for i := 0; i < 10; i++ {
+		oid := writeDummyObject(
+			suite, suite.ioctx, fmt.Sprintf("input data %d", i))
+		created = append(created, oid)
+	}
+	defer cleanObjects(suite, "test-ns-1", created)
+
+	oiter, err := NewObjectsIter(suite.ioctx)
+	assert.NoError(suite.T(), err)
+
+	names1 := []string{}
+	entryChan := make(chan *ObjectsIterEntry)
+	errChan := make(chan error, 1)
+	go oiter.SendAll(entryChan, errChan)
+	for entry := range entryChan {
+		names1 = append(names1, entry.Entry)
+		assert.Equal(suite.T(), "test-ns-1", entry.Namespace)
+	}
+	err = <-errChan
+	oiter.Close()
+
+	assert.NoError(suite.T(), err)
+	assert.Equal(suite.T(), 10, len(names1))
+	sort.Strings(created)
+	sort.Strings(names1)
+	assert.Equal(suite.T(), created, names1)
+}

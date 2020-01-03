@@ -67,6 +67,26 @@ func (iter *ObjectsIter) Close() {
 	iter.isOpen = false
 }
 
+func (iter *ObjectsIter) SendAll(results chan *ObjectsIterEntry, errs chan error) {
+	for {
+		entry, err := iter.Next()
+		switch {
+		case err == RadosErrorNotFound:
+			errs <- nil
+			close(results)
+			close(errs)
+			return
+		case err != nil:
+			errs <- err
+			close(results)
+			close(errs)
+			return
+		default:
+			results <- entry
+		}
+	}
+}
+
 type Iter struct {
 	i         *ObjectsIter
 	err       error
