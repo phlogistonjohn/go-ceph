@@ -47,8 +47,8 @@ func (w *WriteOp) Operate(ioctx *IOContext, oid string) error {
 	defer C.free(unsafe.Pointer(cOid))
 
 	runtime.GC()
-	return getRadosError(int(C.rados_write_op_operate(
-		w.op, ioctx.ioctx, cOid, nil, 0)))
+	return getError(C.rados_write_op_operate(
+		w.op, ioctx.ioctx, cOid, nil, 0))
 }
 
 // Create a rados object.
