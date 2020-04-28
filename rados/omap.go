@@ -7,8 +7,88 @@ package rados
 import "C"
 
 import (
+	"fmt"
 	"unsafe"
 )
+
+type cbuf *C.char
+
+type CharPtr unsafe.Pointer
+type CharPtrPtr unsafe.Pointer
+type SizeTPtr unsafe.Pointer
+
+type bufferKeeper struct {
+	contents    *cbuf
+	contentLens []C.size_t
+}
+
+func (bk *bufferKeeper) Contents() CharPtrPtr {
+	return CharPtrPtr(bk.contents)
+}
+
+func (bk *bufferKeeper) Lengths() SizeTPtr {
+	return SizeTPtr(unsafe.Pointer(&bk.contentLens[0]))
+}
+
+func (bk *bufferKeeper) Len() int {
+	return len(bk.contentLens)
+}
+
+func (bk *bufferKeeper) shift(i int) **C.char {
+	p := uintptr(unsafe.Pointer(bk.contents))
+	off := uintptr(i) * uintptr(charPtrSize)
+	return (**C.char)(unsafe.Pointer(p + off))
+}
+
+func (bk *bufferKeeper) Get(i int) CharPtr {
+	return CharPtr(*bk.shift(i))
+}
+
+func (bk *bufferKeeper) Set(i int, b []byte) {
+	fmt.Println("XXXX", i, b, string(b))
+	ptr := bk.shift(i)
+	l := len(b)
+	if l == 0 {
+		*ptr = nil
+	} else {
+		*ptr = cbuf(unsafe.Pointer(&b[0]))
+	}
+	bk.contentLens[i] = C.size_t(l)
+}
+
+func (bk *bufferKeeper) SetCString(i int, s string) {
+	ptr := bk.shift(i)
+	*ptr = cbuf(C.CString(s))
+	bk.contentLens[i] = C.size_t(len(s))
+}
+
+func (bk *bufferKeeper) Free() {
+	C.free(unsafe.Pointer(bk.contents))
+	bk.contents = nil
+	bk.contentLens = nil
+}
+
+func (bk *bufferKeeper) FreeAll() {
+	for i := range bk.contentLens {
+		C.free(unsafe.Pointer(bk.Get(i)))
+	}
+	bk.Free()
+}
+
+func newBufferKeeper(length int) *bufferKeeper {
+	fmt.Println("NEW", length)
+	bk := &bufferKeeper{}
+	bk.contents = (*cbuf)(C.malloc(C.size_t(length) * charPtrSize))
+	bk.contentLens = make([]C.size_t, length)
+	return bk
+}
+
+var charPtrSize C.size_t
+
+func init() {
+	var c *C.char
+	charPtrSize = C.size_t(unsafe.Sizeof(c))
+}
 
 // SetOmap appends the map `pairs` to the omap `oid`
 func (ioctx *IOContext) SetOmap(oid string, pairs map[string][]byte) error {

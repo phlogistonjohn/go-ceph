@@ -105,32 +105,52 @@ func (w *WriteOp) OmapSet(data map[string][]byte) {
 			(*C.size_t)(c_lengths),
 			C.size_t(len(pairs)))
 	*/
-	count := C.size_t(len(data))
-	krefs := make([]*C.char, count)
-	vrefs := make([]*C.char, count)
-	vlens := make([]C.size_t, count)
-	i := 0
-	for key, value := range data {
-		kstr := C.CString(key)
-		defer C.free(unsafe.Pointer(kstr))
-		krefs[i] = kstr
+	/*
+		count := C.size_t(len(data))
+		krefs := make([]*C.char, count)
+		vrefs := make([]*C.char, count)
+		vlens := make([]C.size_t, count)
+		i := 0
+		for key, value := range data {
+			kstr := C.CString(key)
+			defer C.free(unsafe.Pointer(kstr))
+			krefs[i] = kstr
 
-		if len(value) > 0 {
-			bptr := C.CBytes(value)
-			defer C.free(bptr)
-			vrefs[i] = (*C.char)(bptr)
-			vlens[i] = C.size_t(len(value))
+			if len(value) > 0 {
+				//bptr := C.CBytes(value)
+				//defer C.free(bptr)
+				vrefs[i] = (*C.char)(unsafe.Pointer(&value[0]))
+				vlens[i] = C.size_t(len(value))
+			}
+			i++
 		}
+		C.rados_write_op_omap_set(
+			w.op,
+			(**C.char)(unsafe.Pointer(&krefs[0])),
+			(**C.char)(&vrefs[0]),
+			(*C.size_t)(&vlens[0]),
+			//		(**C.char)(unsafe.Pointer(&vrefs[0])),
+			//		(*C.size_t)(unsafe.Pointer(&vlens[0])),
+			count)
+	*/
+
+	i := 0
+	keys := newBufferKeeper(len(data))
+	values := newBufferKeeper(len(data))
+	for k, v := range data {
+		keys.SetCString(i, k)
+		values.Set(i, v)
 		i++
 	}
+	defer keys.FreeAll()
+	defer values.Free()
+
 	C.rados_write_op_omap_set(
 		w.op,
-		(**C.char)(unsafe.Pointer(&krefs[0])),
-		(**C.char)(&vrefs[0]),
-		(*C.size_t)(&vlens[0]),
-		//		(**C.char)(unsafe.Pointer(&vrefs[0])),
-		//		(*C.size_t)(unsafe.Pointer(&vlens[0])),
-		count)
+		(**C.char)(keys.Contents()),
+		(**C.char)(values.Contents()),
+		(*C.size_t)(values.Lengths()),
+		C.size_t(values.Len()))
 }
 
 func (w *WriteOp) OmapRemoveKeys(keys []string) {
