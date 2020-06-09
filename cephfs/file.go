@@ -38,6 +38,14 @@ const (
 	SyncDataOnly = SyncChoice(1)
 )
 
+var (
+	seekValid = map[int]bool{
+		SeekSet: true,
+		SeekCur: true,
+		SeekEnd: true,
+	}
+)
+
 // File represents an open file descriptor in cephfs.
 type File struct {
 	mount *MountInfo
@@ -230,12 +238,11 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	if err := f.validate(); err != nil {
 		return 0, err
 	}
-	// validate the seek whence value in case the caller skews
-	// from the seek values we technically support from C as documented.
-	// TODO: need to support seek-(hole|data) in mimic and later.
-	switch whence {
-	case SeekSet, SeekCur, SeekEnd:
-	default:
+	// Validate the seek whence value in case the caller strays from the
+	// supported seek values. That's easy as this is an int argument and the
+	// user doesn't have to typecast first. And luminous crashes with a bad
+	// seek whence AFAICT.
+	if !seekValid[whence] {
 		return 0, errInvalid
 	}
 
