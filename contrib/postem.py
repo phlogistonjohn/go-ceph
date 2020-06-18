@@ -7,7 +7,7 @@
 # License: CC0 or Public Domain
 #
 
-
+import argparse
 import json
 import netrc
 import os
@@ -18,8 +18,8 @@ import time
 import github
 
 
-DEBUG = True
-NO_SEND = False
+DEBUG = False
+DRY_RUN = False
 
 
 def update_issue(plan, func_item):
@@ -35,7 +35,7 @@ def update_issue(plan, func_item):
     cfg.setdefault("functions", []).append(func_item["c_name"])
 
 
-def file_issue(gh, topic, group, value):
+def file_issue(cli, gh, topic, group, value):
     name = group
     if value["what"] == "function":
         name = "function {}".format(name)
@@ -56,11 +56,11 @@ def file_issue(gh, topic, group, value):
     body.append("")
     body.append("")
     body = "\n".join(body)
-    if DEBUG:
+    if cli.debug:
         print("~~~~")
         print(f"TITLE: {title}")
         print(f"BODY:\n\n{body}")
-    if NO_SEND:
+    if cli.dry_run:
         return
     if gh.has_issue_with_title(title):
         print("~ found duplicate title, skipping.")
@@ -100,10 +100,34 @@ class GH:
         time.sleep(5)  # avoid annoying github by slamming the api
 
 
+def _file(fname):
+    if fname in ['', '-']:
+        return sys.stdin
+    return argparse.FileType('r')(fname)
+
+
 def main():
-    topic = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description='Automatically submit issues for unimplemented go-ceph funcs')
+    parser.add_argument(
+        '--debug', action='store_true',
+        default=DEBUG,
+        help='enable debugging')
+    parser.add_argument(
+        '--dry-run', '-n', action='store_true',
+        default=DRY_RUN,
+        help='dry run only, do not submit issues')
+    parser.add_argument(
+        'topic', type=str,
+        choices='cephfs rados rbd'.split(),
+        help='What sub-package to use')
+    parser.add_argument(
+        'source', type=_file, default=sys.stdin, nargs='?',
+        help='JSON source file (stdin by default)')
+    cli = parser.parse_args()
+
     plan = {}
-    source = json.load(sys.stdin)
+    source = json.load(cli.source)
     for subsection in source.values():
         for item in subsection["missing"]:
             if item.get("to_issue"):
@@ -113,7 +137,7 @@ def main():
     gh.repo_name = "ceph/go-ceph"
     gh.github = github.Github(token_from_netrc())
     for key, value in plan.items():
-        file_issue(gh, topic, key, value)
+        file_issue(cli, gh, cli.topic, key, value)
 
 
 if __name__ == "__main__":
