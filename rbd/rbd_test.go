@@ -1622,3 +1622,49 @@ func TestOpenImageById(t *testing.T) {
 	conn.DeletePool(poolname)
 	conn.Shutdown()
 }
+
+func TestIssue424(t *testing.T) {
+	conn := radosConnect(t)
+	defer conn.Shutdown()
+
+	poolname := GetUUID()
+	err := conn.MakePool(poolname)
+	assert.NoError(t, err)
+	defer conn.DeletePool(poolname)
+
+	ioctx, err := conn.OpenIOContext(poolname)
+	require.NoError(t, err)
+	defer ioctx.Destroy()
+
+	isize := testImageSize * 8
+	fmt.Println("isize=", isize)
+
+	name := GetUUID()
+	options := NewRbdImageOptions()
+	assert.NoError(t,
+		options.SetUint64(ImageOptionOrder, uint64(testImageOrder)))
+	err = CreateImage(ioctx, name, isize, options)
+	assert.NoError(t, err)
+
+	b := make([]byte, isize)
+	for i := range b {
+		b[i] = 'J'
+	}
+
+	img, err := OpenImage(ioctx, name, NoSnapshot)
+	assert.NoError(t, err)
+
+	ticker := time.NewTicker(300 * time.Millisecond)
+	for i := 0; i < 100; i++ {
+		<-ticker.C
+		fmt.Println("i=", i)
+
+		_, err := img.Discard(0, isize)
+		assert.NoError(t, err)
+
+		n, err := img.WriteAt(b, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, len(b), n)
+	}
+
+}
