@@ -3,15 +3,15 @@ package cutil
 /*
 #include <stdlib.h>
 
-extern void release_lock(void*);
-extern void stored_unlock(void*);
+extern void guard_lock(void*);
+extern void value_unlock(void*);
 
-static inline void storeAndWait(void** c_ptr, void* go_ptr, void* v) {
+static inline void storeUntilRelease(void** c_ptr, void* go_ptr, void* v) {
 	*c_ptr = go_ptr;
-	stored_unlock(v);
-	release_lock(v);
+	value_unlock(v);
+	guard_lock(v);
 	*c_ptr = NULL;
-	stored_unlock(v);
+	value_unlock(v);
 }
 */
 import "C"
@@ -24,7 +24,7 @@ import (
 // PtrGuard respresents a guarded Go pointer (pointing to memory allocated by Go
 // runtime) stored in C memory (allocated by C)
 type PtrGuard struct {
-	stored, release sync.Mutex
+	value, guard sync.Mutex
 	released        bool
 }
 
@@ -39,10 +39,15 @@ type PtrGuard struct {
 // position cPtr, and returns a PtrGuard object.
 func NewPtrGuard(cPtr *unsafe.Pointer, goPtr unsafe.Pointer) *PtrGuard {
 	var v PtrGuard
-	v.release.Lock()
-	v.stored.Lock()
-	go C.storeAndWait(cPtr, goPtr, unsafe.Pointer(&v))
-	v.stored.Lock()
+	// lock both locks so that any later Lock calls block
+	v.guard.Lock()
+	v.value.Lock()
+	// start a background goroutine that lives until Release is called.
+	// this calls a Cgo function, effectively pinning goPtr in place.
+	// while the function runs cPtr will be filled with the value of
+	// the goPtr and nulled out before it exits
+	go C.storeUntilRelease(cPtr, goPtr, unsafe.Pointer(&v))
+	v.value.Lock() // block until C function sets the pointer
 	return &v
 }
 
@@ -51,21 +56,21 @@ func NewPtrGuard(cPtr *unsafe.Pointer, goPtr unsafe.Pointer) *PtrGuard {
 func (v *PtrGuard) Release() {
 	if !v.released {
 		v.released = true
-		v.release.Unlock() // send release signal
-		v.stored.Lock()    // wait for stored signal
+		v.guard.Unlock() // done guarding the pointer, unblock the goroutine
+		v.value.Lock() // block until C function NULLs the pointer
 	}
 }
 
-//export release_lock
-func release_lock(p unsafe.Pointer) {
+//export guard_lock
+func guard_lock(p unsafe.Pointer) {
 	v := (*PtrGuard)(p)
-	v.release.Lock()
+	v.guard.Lock()
 }
 
-//export stored_unlock
-func stored_unlock(p unsafe.Pointer) {
+//export value_unlock
+func value_unlock(p unsafe.Pointer) {
 	v := (*PtrGuard)(p)
-	v.stored.Unlock()
+	v.value.Unlock()
 }
 
 // for tests
