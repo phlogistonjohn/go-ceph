@@ -3,15 +3,15 @@ package cutil
 /*
 #include <stdlib.h>
 
-extern void release_wait(void*);
-extern void stored_signal(void*);
+extern void release_lock(void*);
+extern void stored_unlock(void*);
 
 static inline void storeAndWait(void** c_ptr, void* go_ptr, void* v) {
 	*c_ptr = go_ptr;
-	stored_signal(v);
-	release_wait(v);
+	stored_unlock(v);
+	release_lock(v);
 	*c_ptr = NULL;
-	stored_signal(v);
+	stored_unlock(v);
 }
 */
 import "C"
@@ -21,26 +21,10 @@ import (
 	"unsafe"
 )
 
-type semaphore struct {
-	sync.Mutex
-}
-
-func (v *semaphore) init() {
-	v.wait()
-}
-
-func (v *semaphore) wait() {
-	v.Lock()
-}
-
-func (v *semaphore) signal() {
-	v.Unlock()
-}
-
 // PtrGuard respresents a guarded Go pointer (pointing to memory allocated by Go
 // runtime) stored in C memory (allocated by C)
 type PtrGuard struct {
-	stored, release semaphore
+	stored, release sync.Mutex
 	released        bool
 }
 
@@ -55,10 +39,10 @@ type PtrGuard struct {
 // position cPtr, and returns a PtrGuard object.
 func NewPtrGuard(cPtr *unsafe.Pointer, goPtr unsafe.Pointer) *PtrGuard {
 	var v PtrGuard
-	v.release.init()
-	v.stored.init()
+	v.release.Lock()
+	v.stored.Lock()
 	go C.storeAndWait(cPtr, goPtr, unsafe.Pointer(&v))
-	v.stored.wait()
+	v.stored.Lock()
 	return &v
 }
 
@@ -67,21 +51,21 @@ func NewPtrGuard(cPtr *unsafe.Pointer, goPtr unsafe.Pointer) *PtrGuard {
 func (v *PtrGuard) Release() {
 	if !v.released {
 		v.released = true
-		v.release.signal() // send release signal
-		v.stored.wait()    // wait for stored signal
+		v.release.Unlock() // send release signal
+		v.stored.Lock()    // wait for stored signal
 	}
 }
 
-//export release_wait
-func release_wait(p unsafe.Pointer) {
+//export release_lock
+func release_lock(p unsafe.Pointer) {
 	v := (*PtrGuard)(p)
-	v.release.wait()
+	v.release.Lock()
 }
 
-//export stored_signal
-func stored_signal(p unsafe.Pointer) {
+//export stored_unlock
+func stored_unlock(p unsafe.Pointer) {
 	v := (*PtrGuard)(p)
-	v.stored.signal()
+	v.stored.Unlock()
 }
 
 // for tests
