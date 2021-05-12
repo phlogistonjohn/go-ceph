@@ -11,7 +11,9 @@ MICRO_OSD_PATH="/micro-osd.sh"
 BUILD_TAGS=""
 RESULTS_DIR=/results
 CEPH_CONF=/tmp/ceph/ceph.conf
-
+if [ -z "$EXCLUDED_PKGS" ]; then
+  EXCLUDED_PKGS=contrib
+fi
 
 # Default env vars that are not currently changed by this script
 # but can be used to change the test behavior:
@@ -242,7 +244,7 @@ test_go_ceph() {
     fi
 
     PKG_PREFIX=github.com/ceph/go-ceph
-    pkgs=$(go list ./... | sed -e "s,^${PKG_PREFIX}/\?,," | grep -v ^contrib)
+    pkgs=$(go list ./... | sed -e "s,^${PKG_PREFIX}/\?,," | grep -vE ^"$EXCLUDED_PKGS")
     pre_all_tests
     if [[ ${WAIT_FILES} ]]; then
         wait_for_files ${WAIT_FILES//:/ }
