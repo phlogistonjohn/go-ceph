@@ -63,7 +63,7 @@ func TestUnmarshal(t *testing.T) {
 func (suite *RadosGWTestSuite) TestUser() {
 	suite.SetupConnection()
 	co, err := New(suite.endpoint, suite.accessKey, suite.secretKey, nil)
-	co.Debug = true
+	co.HTTPClient = debugClient(co.HTTPClient)
 	assert.NoError(suite.T(), err)
 
 	suite.T().Run("fail to create user since no UID provided", func(t *testing.T) {
