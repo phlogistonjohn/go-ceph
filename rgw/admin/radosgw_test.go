@@ -21,7 +21,7 @@ func TestRadosGWTestSuite(t *testing.T) {
 func (suite *RadosGWTestSuite) SetupConnection() {
 	suite.accessKey = "2262XNX11FZRR44XWIRD"
 	suite.secretKey = "rmtuS1Uj1bIC08QFYGW18GfSHAbkPqdsuYynNudw"
-	suite.endpoint = "http://test_ceph_a"
+	suite.endpoint = "http://localhost"
 }
 
 func TestNew(t *testing.T) {
