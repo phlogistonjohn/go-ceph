@@ -171,7 +171,9 @@ setup_mirroring() {
 
 test_pkg() {
     local pkg="${1}"
+    echo "--> $pkg"
     if [[ "${TEST_PKG}" && "${TEST_PKG}" != "${pkg}" ]]; then
+        echo "--> ${TEST_PKG} && ${TEST_PKG} != ${pkg}"
         return 0
     fi
 
