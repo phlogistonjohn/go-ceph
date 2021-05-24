@@ -10,7 +10,7 @@ import (
 func (suite *RadosGWTestSuite) TestUsage() {
 	suite.SetupConnection()
 	co, err := New(suite.endpoint, suite.accessKey, suite.secretKey, nil)
-	co.Debug = true
+	co.HTTPClient = debugClient(co.HTTPClient)
 	assert.NoError(suite.T(), err)
 
 	suite.T().Run("get usage", func(t *testing.T) {
