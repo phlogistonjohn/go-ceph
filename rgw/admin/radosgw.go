@@ -39,12 +39,16 @@ type API struct {
 	AccessKey  string
 	SecretKey  string
 	Endpoint   string
-	HTTPClient *http.Client
+	HTTPClient HTTPClient
 	Debug      bool
 }
 
+type HTTPClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
 // New returns client for Ceph RGW
-func New(endpoint, accessKey, secretKey string, httpClient *http.Client) (*API, error) {
+func New(endpoint, accessKey, secretKey string, httpClient HTTPClient) (*API, error) {
 	// validate endpoint
 	if endpoint == "" {
 		return nil, errNoEndpoint
