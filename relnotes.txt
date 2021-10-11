@@ -1,16 +1,12 @@
-The maintainers and contributors to go-ceph are pleased to announce the v0.11.0
+The maintainers and contributors to go-ceph are pleased to announce the v0.12.0
 release. This is another great step towards making it possible to use the power
 of the Ceph APIs in the Go language.
 
-This release sees that addition of new RBD APIs for managing encryption.  The
-go-ceph rbd package can now configure LUKS encryption for an image as well as
-read & write to an image with LUKS-style encryption. A big thank you to
-contributor Effi Ofer for these additions.
-
-We have also added intial support for CephFS mirroring to the cephfs admin
-package. Functions have been added that support enabling mirroring, basic
-management of site peers, and adding or removing directories to be mirrored.
-Please see the docs for the cephfs/admin package for full details.
+With this release go-ceph, via the rbd admin package, can now interact with RBD
+asynchronous tasks. These tasks perform actions like flattening or removing an
+image in the background. The tasks run within the Ceph cluster (the MGR) rather
+than synchronously from the (go-ceph) client. We'd like to extend our thanks to
+contribtor Rakshith R. for these changes!
 
 As this is a v0.x release we do not guarantee backwards compatibility with
 previous versions of the code. However, we aim not to disrupt existing
@@ -20,58 +16,56 @@ breaking changes without very good justification. Please see the "Deprecations
 future and prepare your code ahead of time. You may also want to view
 "Deprecations & Removals" of previous releases as they are not repeated here.
 
-Please note that for future releases we will start using a build tag to
-demarcate new APIs that we want tested and tried out but we do not commit to
-keeping the API stable yet. The exact details of this policy will be set out
-soon and provided in the following go-ceph release.
+Please note that with this release we have started using the `ceph_preview`
+build tag to demarcate new APIs that we want tested and tried out but we do not
+commit to keeping the API stable. The details of this policy are available in
+the API Stability Document [1] and information about the status of deprecated
+and preview APIs can be found in the API Status Document [2].
 
 # New Features
 
-* In the cephfs package
-  * Add ReadConfigFile implementing ceph_conf_read_file
+* In the rbd package:
+  * Add MirrorImageInstanceIDList and MirrorImageInstanceIDIter implementing
+    rbd_mirror_image_instance_id_list
 
-* In the cephfs admin:
-  * Add EnableMirroringModule function
-  * Add DisableMirroringModule function
-  * Add SnapshotMirrorAdmin type and many functions related to cephfs mirroring
-
-* In the rbd package
-  * Add EncryptionFormat implementing rbd_encryption_format
-  * Add EncryptionLoad implementing rbd_encryption_load
-  * Add MirrorImageInfoIter type implementing rbd_mirror_image_info_list
-  * Add MirrorImageInfoList implementing rbd_mirror_image_info_list
-  * Add MirrorImageGlobalStatusList implementing rbd_mirror_image_status_list
+* In the rbd admin package:
+  * Add ImageSpec type
+  * Add TaskAdmin function AddFlatten
+  * Add TaskAdmin function AddRemove
+  * Add TaskAdmin function AddTrashRemove
+  * Add TaskAdmin function Cancel
+  * Add TaskAdmin function GetTaskByID
+  * Add TaskAdmin function List
 
 * In the rgw admin package:
-  * Add support for HTTP client interface
-  * Add Stat & GenerateStat fields to the User struct
-  * Add UserCaps field to the User struct
+  * Add AddUserCap function
+  * Add RemoveUserCap function
 
 
 # Deprecations & Removals
 
-* In the rgw admin package:
-  * Remove the Debug field from the API type.
-* In the rbd package:
-  * Deprecate Close() method of MirrorImageGlobalStatusIter
-
-It is planned that go-ceph v0.11 will be the last release to fully support ceph
-nautilus and that for *the following* go-ceph release ceph nautilus support
-will be deprecated.
+With go-ceph v0.12.0 support for Ceph "Nautilus" is offically deprecated.
 
 
 # Other
 
-* Support enabling dependency caching for container rules in the Makefile
-* Added a Makefile flag to run more go commands via a container
-* Improved devcontainer support for VSCode
-* Internal improvements to variable names
-* Minor code improvements in the rgw/admin package
-* Removed some code for non-supported ceph mimic & luminous versions
-* Support for testing cephfs mirroring
+* Fixes for PtrGuard tests
+* Standardization of many internal variable names
+* Enabled previously skipped cephfs tests
+* Improvements to cephfs test cases
+* Use ceph/ceph as the base image for test containers
+* Add a mirror state option to the entrypoint script
+* Reuse running ceph container(s) in makefile, when possible
+* Run tests with the `ceph_preview` build tag
+* Improve `implements` the go-ceph API analysis tool
+* Add a tool to help track the status of APIs
+* Improve documentation visibilty of some deprecated items
 * Other fixes and improvements
 
 
+[1] - https://github.com/ceph/go-ceph/blob/master/docs/api-stability.md
+[2] - https://github.com/ceph/go-ceph/blob/master/docs/api-status.md
+
 <--
-UPTO 
+UPTO 87f4563
 -->
