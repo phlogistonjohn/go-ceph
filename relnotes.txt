@@ -1,12 +1,11 @@
-The maintainers and contributors to go-ceph are pleased to announce the v0.12.0
+The maintainers and contributors to go-ceph are pleased to announce the v0.13.0
 release. This is another great step towards making it possible to use the power
 of the Ceph APIs in the Go language.
 
-With this release go-ceph, via the rbd admin package, can now interact with RBD
-asynchronous tasks. These tasks perform actions like flattening or removing an
-image in the background. The tasks run within the Ceph cluster (the MGR) rather
-than synchronously from the (go-ceph) client. We'd like to extend our thanks to
-contribtor Rakshith R. for these changes!
+Big thanks to contributor Robert Vasek for providing a new function to the
+WriteOp type. The CmpExt function supports comparing a byte sequence against
+one within a rados object allowing one to add an assertion of matching content
+as part of a single write operation.
 
 As this is a v0.x release we do not guarantee backwards compatibility with
 previous versions of the code. However, we aim not to disrupt existing
@@ -16,56 +15,49 @@ breaking changes without very good justification. Please see the "Deprecations
 future and prepare your code ahead of time. You may also want to view
 "Deprecations & Removals" of previous releases as they are not repeated here.
 
-Please note that with this release we have started using the `ceph_preview`
-build tag to demarcate new APIs that we want tested and tried out but we do not
-commit to keeping the API stable. The details of this policy are available in
-the API Stability Document [1] and information about the status of deprecated
-and preview APIs can be found in the API Status Document [2].
 
 # New Features
 
+* In the rados package:
+  * Add WriteOp CmpExt implementing rados_write_op_cmpext (preview)
+
 * In the rbd package:
-  * Add MirrorImageInstanceIDList and MirrorImageInstanceIDIter implementing
-    rbd_mirror_image_instance_id_list
+  * Add GetName accessor function
+
+# Now Stable
 
 * In the rbd admin package:
-  * Add ImageSpec type
-  * Add TaskAdmin function AddFlatten
-  * Add TaskAdmin function AddRemove
-  * Add TaskAdmin function AddTrashRemove
-  * Add TaskAdmin function Cancel
-  * Add TaskAdmin function GetTaskByID
-  * Add TaskAdmin function List
+  * The ImageSpec type
+  * The TaskAdmin function AddFlatten
+  * The TaskAdmin function AddRemove
+  * The TaskAdmin function AddTrashRemove
+  * The TaskAdmin function Cancel
+  * The TaskAdmin function GetTaskByID
+  * The TaskAdmin function List
 
 * In the rgw admin package:
-  * Add AddUserCap function
-  * Add RemoveUserCap function
+  * The AddUserCap function
+  * The RemoveUserCap function
 
 
 # Deprecations & Removals
 
-With go-ceph v0.12.0 support for Ceph "Nautilus" is offically deprecated.
+In go-ceph v0.12.0 support for Ceph "Nautilus" was deprecated. Support for
+nautilus will be removed in a future release.
 
 
 # Other
 
-* Fixes for PtrGuard tests
-* Standardization of many internal variable names
-* Enabled previously skipped cephfs tests
-* Improvements to cephfs test cases
-* Use ceph/ceph as the base image for test containers
-* Add a mirror state option to the entrypoint script
-* Reuse running ceph container(s) in makefile, when possible
-* Run tests with the `ceph_preview` build tag
-* Improve `implements` the go-ceph API analysis tool
-* Add a tool to help track the status of APIs
-* Improve documentation visibilty of some deprecated items
+* Improve reliability of cephfs mirroring tests
+* All remaining build tags for "luminous" and "mimic" were removed. Previous
+  releases had already removed support for those ceph versions
+* Add workflow automation for deprecated and preview apis
+* Document processes around deprecated and preview apis
+* Improve C memory allocations in rados
+* Fix rgw admin example documentation
 * Other fixes and improvements
 
 
-[1] - https://github.com/ceph/go-ceph/blob/master/docs/api-stability.md
-[2] - https://github.com/ceph/go-ceph/blob/master/docs/api-status.md
-
 <--
-UPTO 87f4563
+UPTO a833cd7
 -->
