@@ -1,11 +1,12 @@
-The maintainers and contributors to go-ceph are pleased to announce the v0.13.0
+The maintainers and contributors to go-ceph are pleased to announce the v0.14.0
 release. This is another great step towards making it possible to use the power
 of the Ceph APIs in the Go language.
 
-Big thanks to contributor Robert Vasek for providing a new function to the
-WriteOp type. The CmpExt function supports comparing a byte sequence against
-one within a rados object allowing one to add an assertion of matching content
-as part of a single write operation.
+Another round of thanks to contributor Robert Vasek for adding more API calls
+to the rados module. Both ReadOp and WriteOp types have been extended with new
+function calls, including the ability to assert the rados version preventing
+unexpected state changes. See the features list for an expanded list of
+the new function calls.
 
 As this is a v0.x release we do not guarantee backwards compatibility with
 previous versions of the code. However, we aim not to disrupt existing
@@ -18,46 +19,59 @@ future and prepare your code ahead of time. You may also want to view
 
 # New Features
 
-* In the rados package:
-  * Add WriteOp CmpExt implementing rados_write_op_cmpext (preview)
+* In the rados package (preview APIs):
+  * Add ReadOp method Read implementing rados_read_op_read
+  * Add WriteOp method Remove implementing rados_write_op_remove
+  * Add ReadOp method AssertVersion implementing rados_read_op_assert_version
+  * Add WriteOp method AssertVersion implementing rados_write_op_assert_version
+  * Add WriteOp method SetXattr implementing rados_write_op_setxattr
+  * Add ReadOp method GetOmapValuesByKeys implementing read_op_omap_get_vals_by_keys
+  * Add Watcher type
+  * Add NotifyEvent type
+  * Add WatchWithTimeout and Watch implementing rados_watch3
+  * Add Watcher method Check implementing rados_watch_check
+  * Add Watcher method Delete implementing rados_unwatch2
+  * Add NotifyWithTimeout and Notify implementing rados_notify2
+  * Add NotifyEvent method Ack implementing rados_notify_ack
+  * Add WatcherFlush implementing rados_watch_flush
 
-* In the rbd package:
-  * Add GetName accessor function
+* In the common admin manager package:
+  * Create a new package for ceph mgr module functions
+  * Move EnableModule from cephfs admin
+  * Move DisableModule from cephfs admin
+  * Move ListModules from cephfs admin
+
 
 # Now Stable
 
-* In the rbd admin package:
-  * The ImageSpec type
-  * The TaskAdmin function AddFlatten
-  * The TaskAdmin function AddRemove
-  * The TaskAdmin function AddTrashRemove
-  * The TaskAdmin function Cancel
-  * The TaskAdmin function GetTaskByID
-  * The TaskAdmin function List
-
-* In the rgw admin package:
-  * The AddUserCap function
-  * The RemoveUserCap function
+* In the rados package:
+  * The WriteOp CmpExt function
 
 
 # Deprecations & Removals
 
-In go-ceph v0.12.0 support for Ceph "Nautilus" was deprecated. Support for
-nautilus will be removed in a future release.
+The functions EnableModule and DisableModule present in cephfs admin are now
+deprecated. Use the same functions from the new "common/admin/manager" location
+instead.
+
+Ceph "Nautilus" continues to be deprecated.
 
 
 # Other
 
 * Improve reliability of cephfs mirroring tests
-* All remaining build tags for "luminous" and "mimic" were removed. Previous
-  releases had already removed support for those ceph versions
-* Add workflow automation for deprecated and preview apis
-* Document processes around deprecated and preview apis
-* Improve C memory allocations in rados
-* Fix rgw admin example documentation
+* Improve doc comments for rbd Read and Write functions
+* Fix project workflow automation
+* Document centos specific package dependency hints
+* Improve api documentation workflow
+* Fix issues building container images
+* Fix running static checks on preview APIs
+* Fix code style issue in cutil package
+* Fix doc comments in the rados package
+* Add internal library code for writing tests
 * Other fixes and improvements
 
 
 <--
-UPTO a833cd7
+UPTO d3a4a05
 -->
