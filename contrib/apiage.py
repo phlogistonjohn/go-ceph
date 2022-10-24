@@ -389,6 +389,7 @@ def main():
             "find-updates",
             "updates-to-markdown",
             "promote",
+            "next-ver",
         ),
         default="compare",
         help="either update current state or compare current state to source",
@@ -520,6 +521,8 @@ def main():
     elif cli.mode == "updates-to-markdown":
         updates_needed = json.load(sys.stdin)
         format_updates_markdown(updates_needed, sys.stdout)
+    elif cli.mode == "next-ver":
+        print("{}".format(cli.added_in_version))
 
 
 if __name__ == "__main__":
