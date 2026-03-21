@@ -830,3 +830,47 @@ func TestBuilderWrapsAll(t *testing.T) {
 		}
 	}
 }
+
+func TestBuilderApply1(t *testing.T) {
+	cde := CommandDescriptions{}
+	b := []byte(sample1)
+	assert.NoError(t, json.Unmarshal(b, &cde))
+	assert.Len(t, cde.Entries, 37)
+
+	matches := cde.Find("osd", "df")
+	assert.Len(t, matches, 1)
+
+	bld := NewBuilder(matches[0])
+	argTypes := bld.Arguments()
+	assert.Len(t, argTypes, 3)
+
+	assert.NoError(t, bld.Apply([]string{"tree", "name", "plume"}, nil))
+	assert.Len(t, bld.Values, 4)
+	assert.EqualValues(t, "osd df", bld.Values["prefix"])
+	assert.EqualValues(t, "tree", bld.Values["output_method"])
+	assert.EqualValues(t, "name", bld.Values["filter_by"])
+	assert.EqualValues(t, "plume", bld.Values["filter"])
+}
+
+func TestBuilderApply2(t *testing.T) {
+	cde := CommandDescriptions{}
+	b := []byte(sample1)
+	assert.NoError(t, json.Unmarshal(b, &cde))
+	assert.Len(t, cde.Entries, 37)
+
+	matches := cde.Find("osd", "df")
+	assert.Len(t, matches, 1)
+
+	bld := NewBuilder(matches[0])
+	argTypes := bld.Arguments()
+	assert.Len(t, argTypes, 3)
+
+	assert.NoError(t, bld.Apply(
+		[]string{"tree"},
+		map[string]string{"filter_by": "class", "filter": "ghi"}))
+	assert.Len(t, bld.Values, 4)
+	assert.EqualValues(t, "osd df", bld.Values["prefix"])
+	assert.EqualValues(t, "tree", bld.Values["output_method"])
+	assert.EqualValues(t, "class", bld.Values["filter_by"])
+	assert.EqualValues(t, "ghi", bld.Values["filter"])
+}
