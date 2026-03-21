@@ -815,3 +815,18 @@ func TestBuilder3(t *testing.T) {
 	assert.EqualValues(t, []any{"all", "summary"}, bld.Values[cat.Name()])
 	assert.NoError(t, cat.Validate(bld.Values))
 }
+
+func TestBuilderWrapsAll(t *testing.T) {
+	cde := CommandDescriptions{}
+	b := []byte(sample1)
+	assert.NoError(t, json.Unmarshal(b, &cde))
+	assert.Len(t, cde.Entries, 37)
+
+	for _, d := range cde.Entries {
+		bld := NewBuilder(d)
+		for _, a := range bld.Arguments() {
+			assert.NotContains(t, a.TypeName(), "Unknown")
+			assert.NotEmpty(t, a.Name())
+		}
+	}
+}
