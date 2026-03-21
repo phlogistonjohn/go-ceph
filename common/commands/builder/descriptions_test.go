@@ -713,7 +713,7 @@ func TestDescriptionUnmarshal(t *testing.T) {
 		assert.EqualValues(t, vars[0].Name, "dumpcontents")
 		assert.EqualValues(t, vars[0].Type, "CephChoices")
 		assert.EqualValues(t, vars[0].Choices, "all|summary|sum|pools|osds|pgs")
-		assert.EqualValues(t, vars[0].Req, false)
+		assert.EqualValues(t, vars[0].Required(), false)
 		assert.EqualValues(t, vars[0].Repeat, "N")
 	})
 }
@@ -732,4 +732,86 @@ func TestDescriptionFind(t *testing.T) {
 
 	matches = cde.Find("osd", "pool", "scrub")
 	assert.Len(t, matches, 1)
+}
+
+/* LAZY ZONE ---------------------------------- */
+
+func TestBuilder1(t *testing.T) {
+	cde := CommandDescriptions{}
+	b := []byte(sample1)
+	assert.NoError(t, json.Unmarshal(b, &cde))
+	assert.Len(t, cde.Entries, 37)
+
+	matches := cde.Find("osd", "reweight-by-utilization")
+	assert.Len(t, matches, 1)
+
+	bld := NewBuilder(matches[0])
+	argTypes := bld.Arguments()
+	assert.Len(t, argTypes, 4)
+
+	assert.EqualValues(t, "CephInt", argTypes[0].TypeName())
+	assert.NoError(t, argTypes[0].Set(bld.Values, 44))
+	assert.NoError(t, argTypes[0].Set(bld.Values, "11"))
+	assert.Error(t, argTypes[0].Set(bld.Values, nil))
+	assert.NoError(t, argTypes[0].Validate(bld.Values))
+
+	assert.EqualValues(t, "CephFloat", argTypes[1].TypeName())
+	assert.NoError(t, argTypes[1].Set(bld.Values, 4.4))
+	assert.NoError(t, argTypes[1].Set(bld.Values, "11"))
+	assert.Error(t, argTypes[1].Set(bld.Values, nil))
+	assert.NoError(t, argTypes[1].Validate(bld.Values))
+
+	assert.EqualValues(t, "CephInt", argTypes[2].TypeName())
+
+	assert.EqualValues(t, "CephBool", argTypes[3].TypeName())
+	assert.NoError(t, argTypes[3].Set(bld.Values, true))
+	assert.NoError(t, argTypes[3].Set(bld.Values, "false"))
+	assert.Error(t, argTypes[3].Set(bld.Values, nil))
+	assert.NoError(t, argTypes[3].Validate(bld.Values))
+
+	bld.Values["no_increasing"] = nil
+	assert.Error(t, argTypes[3].Validate(bld.Values))
+}
+
+func TestBuilder2(t *testing.T) {
+	cde := CommandDescriptions{}
+	b := []byte(sample1)
+	assert.NoError(t, json.Unmarshal(b, &cde))
+	assert.Len(t, cde.Entries, 37)
+
+	matches := cde.Find("osd", "pool", "scrub")
+	assert.Len(t, matches, 1)
+
+	bld := NewBuilder(matches[0])
+	argTypes := bld.Arguments()
+	assert.Len(t, argTypes, 1)
+
+	cat := argTypes[0]
+	assert.EqualValues(t, "CephPoolname (Repeat: N)", cat.TypeName())
+	assert.NoError(t, cat.Set(bld.Values, []string{"foo", "bar"}))
+	assert.NoError(t, cat.Set(bld.Values, "bloop"))
+	assert.EqualValues(t, []any{"foo", "bar", "bloop"}, bld.Values[cat.Name()])
+}
+
+func TestBuilder3(t *testing.T) {
+	cde := CommandDescriptions{}
+	b := []byte(sample1)
+	assert.NoError(t, json.Unmarshal(b, &cde))
+	assert.Len(t, cde.Entries, 37)
+
+	matches := cde.Find("pg", "dump_json")
+	assert.Len(t, matches, 1)
+
+	bld := NewBuilder(matches[0])
+	argTypes := bld.Arguments()
+	assert.Len(t, argTypes, 1)
+
+	cat := argTypes[0]
+	assert.EqualValues(t, "CephChoices (Repeat: N)", cat.TypeName())
+	assert.Error(t, cat.Set(bld.Values, "bronco"))
+	assert.Error(t, cat.Set(bld.Values, "splatter"))
+	assert.NoError(t, cat.Set(bld.Values, "all"))
+	assert.NoError(t, cat.Set(bld.Values, "summary"))
+	assert.EqualValues(t, []any{"all", "summary"}, bld.Values[cat.Name()])
+	assert.NoError(t, cat.Validate(bld.Values))
 }
