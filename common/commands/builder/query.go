@@ -16,6 +16,9 @@ func queryMon(m ccom.MonCommander) commands.Response {
 	return commands.NewResponse(m.MonCommand(queryCommand))
 }
 
+// QueryMgrJSON makes a request to the Ceph MGR to describe the commands that
+// the service knows about. This function returns the response as raw JSON
+// encoded bytes.
 func QueryMgrJSON(m ccom.MgrCommander) ([]byte, error) {
 	response := queryMgr(m).NoStatus()
 	if response.Ok() {
@@ -24,6 +27,9 @@ func QueryMgrJSON(m ccom.MgrCommander) ([]byte, error) {
 	return nil, response
 }
 
+// QueryMonJSON makes a request to the Ceph MON to describe the commands that
+// the service knows about. This function returns the response as raw JSON
+// encoded bytes.
 func QueryMonJSON(m ccom.MonCommander) ([]byte, error) {
 	response := queryMon(m).NoStatus()
 	if response.Ok() {
@@ -32,7 +38,9 @@ func QueryMonJSON(m ccom.MonCommander) ([]byte, error) {
 	return nil, response
 }
 
-// QueryMgrDescriptions
+// QueryMgrDescriptions makes a request to the Ceph MGR to describe the
+// commands that the service knows about. This function returns the response as
+// a CommandDescriptions object.
 func QueryMgrDescriptions(m ccom.MgrCommander) (CommandDescriptions, error) {
 	cd := CommandDescriptions{}
 	if err := queryMgr(m).NoStatus().Unmarshal(&cd).End(); err != nil {
@@ -41,7 +49,9 @@ func QueryMgrDescriptions(m ccom.MgrCommander) (CommandDescriptions, error) {
 	return cd, nil
 }
 
-// QueryMonDescriptions
+// QueryMonDescriptions makes a request to the Ceph MGR to describe the
+// commands that the service knows about. This function returns the response as
+// a CommandDescriptions object.
 func QueryMonDescriptions(m ccom.MonCommander) (CommandDescriptions, error) {
 	cd := CommandDescriptions{}
 	if err := queryMon(m).NoStatus().Unmarshal(&cd).End(); err != nil {
