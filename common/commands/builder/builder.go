@@ -45,10 +45,40 @@ func (b *Builder) Validate() error {
 }
 
 func (b *Builder) applyArgs(args []string) error {
+	argtypes := b.Arguments()
+	tlen := len(argtypes)
+	for i, argval := range args {
+		if i >= tlen {
+			lat := argtypes[tlen-1]
+			if alat, ok := lat.(CephMultiArgumentType); ok {
+				if err := alat.Append(b.Values, argval); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if err := argtypes[i].Set(b.Values, argval); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (b *Builder) applyNamedArgs(args map[string]string) error {
+	m := map[string]CephArgumentType{}
+	for _, argtype := range b.Arguments() {
+		m[argtype.Name()] = argtype
+	}
+
+	for k, argval := range args {
+		cat, ok := m[k]
+		if !ok {
+			return fmt.Errorf("not found: %s", k)
+		}
+		if err := cat.Set(b.Values, argval); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
