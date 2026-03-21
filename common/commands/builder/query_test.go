@@ -26,7 +26,7 @@ func (suite *CommandBuilderSuite) SetupSuite() {
 	suite.vconn = admintest.NewConnector()
 }
 
-func (suite *CommandBuilderSuite) TearDownSuite() {
+func (*CommandBuilderSuite) TearDownSuite() {
 }
 
 func (suite *CommandBuilderSuite) TestQueryMonJSON() {
