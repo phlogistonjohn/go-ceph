@@ -10,9 +10,16 @@ import (
 type SignatureVar struct {
 	Name    string `json:"name"`
 	Type    string `json:"type"`
-	Req     bool   `json:"req"`
+	Req     *bool  `json:"req"`
 	Choices string `json:"strings"`
 	Repeat  string `json:"n"`
+}
+
+func (sv SignatureVar) Required() bool {
+	if sv.Req == nil {
+		return true
+	}
+	return *(sv.Req)
 }
 
 type SignatureElement struct {
