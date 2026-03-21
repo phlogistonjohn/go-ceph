@@ -7,14 +7,31 @@ import (
 	"strings"
 )
 
+// CephTypeFunc signatures describe a function that can provide a
+// CephArgumentType instance given a SignatureVar object. This is used to
+// customize argument type look ups if needed.
 type CephTypeFunc func(*SignatureVar) CephArgumentType
 
+// Builder objects are used to construct command inputs that interact with Ceph
+// APIs such as MgrCommand, MonCommand, and so forth.  This type provides a
+// MarshalJSON method that will return JSON encoded bytes that can be passed as
+// the first argument to these RADOS APIs.  The MarshalJSON uses the command
+// description to produce argument types that validate the contents of the
+// Values map.
+// The Values map is public so that you can directly manipulate the contents in
+// unplanned ways and customize what gets encoded in the final JSON.
+// You can also customize the ceph types returned by setting an alternative
+// GetType attribute. By default, this uses the BindArgumentType function but
+// you can replace or re-use this function to return customized
+// CephArgumentType values to fit your needs.
 type Builder struct {
 	Values      map[string]any
 	Description Description
 	GetType     CephTypeFunc
 }
 
+// NewBuilder returns a new command builder given a Description of ceph
+// command.
 func NewBuilder(d Description) *Builder {
 	b := Builder{
 		Values:      map[string]any{},
@@ -24,11 +41,16 @@ func NewBuilder(d Description) *Builder {
 	return b.Prepare()
 }
 
+// Prepare sets default values in the Values map. It is called
+// automatically by NewBuilder. It can be used to reset values
+// in the map if needed.
 func (b *Builder) Prepare() *Builder {
 	b.Values["prefix"] = b.Description.PrefixString()
 	return b
 }
 
+// Arguments returns a slice of all the ceph argument types known
+// to this builder.
 func (b *Builder) Arguments() []CephArgumentType {
 	out := []CephArgumentType{}
 	for _, v := range b.Description.Variables() {
@@ -37,6 +59,18 @@ func (b *Builder) Arguments() []CephArgumentType {
 	return out
 }
 
+// ArgumentsMap returns a map of argument names to the various ceph argument
+// types known to this builder.
+func (b *Builder) ArgumentsMap() map[string]CephArgumentType {
+	m := map[string]CephArgumentType{}
+	for _, argtype := range b.Arguments() {
+		m[argtype.Name()] = argtype
+	}
+	return m
+}
+
+// Validate returns an error if the contents of the Values map do not match
+// parameters defined by the ceph argument types known to this builder.
 func (b *Builder) Validate() error {
 	for _, t := range b.Arguments() {
 		t.Validate(b.Values)
@@ -65,11 +99,7 @@ func (b *Builder) applyArgs(args []string) error {
 }
 
 func (b *Builder) applyNamedArgs(args map[string]string) error {
-	m := map[string]CephArgumentType{}
-	for _, argtype := range b.Arguments() {
-		m[argtype.Name()] = argtype
-	}
-
+	m := b.ArgumentsMap()
 	for k, argval := range args {
 		cat, ok := m[k]
 		if !ok {
@@ -82,6 +112,24 @@ func (b *Builder) applyNamedArgs(args map[string]string) error {
 	return nil
 }
 
+// MarshalJSON returns the builder's Values map as JSON encoded bytes or an
+// error if the Values don't validate or marshal to JSON.
+func (b *Builder) MarshalJSON() ([]byte, error) {
+	if err := b.Validate(); err != nil {
+		return nil, err
+	}
+	return json.Marshal(b.Values)
+}
+
+// Apply takes string argument values, in either a slice (linear) or
+// map (named) form and, using the known argument types, converts
+// the values and stores the results in the builder's Values map.
+//
+// NB. This function doesn't handle repeat arguments (n:N) other than in
+// the args slice and then only at the end of the slice. This function
+// is meant to serve as a simple example for mapping argument values into
+// a call to MonCommand/MgrCommand/etc. not implement everything the
+// standard `ceph` command can do.
 func (b *Builder) Apply(args []string, named map[string]string) error {
 	if len(args) > 0 {
 		if err := b.applyArgs(args); err != nil {
@@ -96,337 +144,14 @@ func (b *Builder) Apply(args []string, named map[string]string) error {
 	return nil
 }
 
-type CephArgumentType interface {
-	TypeName() string
-	Name() string
-	Set(map[string]any, any) error
-	Validate(map[string]any) error
-}
-
-type CephScalarArgumentType interface {
-	CephArgumentType
-	Convert(v any) (any, error)
-	Check(v any) error
-}
-
-type CephMultiArgumentType interface {
-	Append(map[string]any, any) error
-}
-
-/* Type: Ceph Choices */
-
-type CephChoices struct {
-	sv *SignatureVar
-}
-
-func (*CephChoices) TypeName() string { return "CephChoices" }
-
-func (t *CephChoices) Name() string { return t.sv.Name }
-
-func (t *CephChoices) Choices() map[string]bool {
-	m := map[string]bool{}
-	for _, ch := range strings.Split(t.sv.Choices, "|") {
-		m[ch] = true
-	}
-	return m
-}
-
-func (t *CephChoices) choose(s string) (string, error) {
-	if !t.Choices()[s] {
-		return "", fmt.Errorf("invalid choice: %s", s)
-	}
-	return s, nil
-}
-
-func (t *CephChoices) Convert(v any) (any, error) {
-	switch vs := v.(type) {
-	case string:
-		return t.choose(vs)
-	case fmt.Stringer:
-		return t.choose(vs.String())
-	}
-	return "", fmt.Errorf("not a string: %v", v)
-}
-
-func (t *CephChoices) Check(v any) error {
-	s, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("not a string: %v (at %s)", v, t.sv.Name)
-	}
-	if !t.Choices()[s] {
-		return fmt.Errorf("invalid choice: %s (at %s)", s, t.sv.Name)
-	}
-	return nil
-}
-
-func (t *CephChoices) Set(data map[string]any, v any) error {
-	x, e := t.Convert(v)
-	return save(t.sv, data, x, e)
-}
-
-func (t *CephChoices) Validate(data map[string]any) error {
-	return checkEntry(t.sv, t, data)
-}
-
-/* Type: Ceph String */
-
-type CephString struct {
-	sv *SignatureVar
-}
-
-func (*CephString) TypeName() string { return "CephString" }
-
-func (t *CephString) Name() string { return t.sv.Name }
-
-func (t *CephString) Convert(v any) (any, error) {
-	if s, ok := v.(string); ok {
-		return s, nil
-	}
-	if ss, ok := v.(fmt.Stringer); ok {
-		return ss.String(), nil
-	}
-	return "", fmt.Errorf("not a string: %v", v)
-}
-
-func (t *CephString) Check(v any) error {
-	if _, ok := v.(string); !ok {
-		return fmt.Errorf("not a string: %v (at %s)", v, t.sv.Name)
-	}
-	return nil
-}
-
-func (t *CephString) Set(data map[string]any, v any) error {
-	x, e := t.Convert(v)
-	return save(t.sv, data, x, e)
-}
-
-func (t *CephString) Validate(data map[string]any) error {
-	return checkEntry(t.sv, t, data)
-}
-
-/* Type: Ceph Int */
-
-type CephInt struct {
-	sv *SignatureVar
-}
-
-func (*CephInt) TypeName() string { return "CephInt" }
-
-func (t *CephInt) Name() string { return t.sv.Name }
-
-func (t *CephInt) Convert(v any) (any, error) {
-	switch vv := v.(type) {
-	case int, int64, uint64, int32, uint32, int16, uint16, int8, uint8:
-		return vv, nil
-	case string:
-		return strconv.ParseInt(vv, 10, 64)
-	}
-	return "", fmt.Errorf("not a CephInt: %v", v)
-}
-
-func (t *CephInt) Check(v any) error {
-	switch v.(type) {
-	case int, int64, uint64, int32, uint32, int16, uint16, int8, uint8:
-		return nil
-	}
-	return fmt.Errorf("not a CephInt: %v (at %s)", v, t.sv.Name)
-}
-
-func (t *CephInt) Set(data map[string]any, v any) error {
-	x, e := t.Convert(v)
-	return save(t.sv, data, x, e)
-}
-
-func (t *CephInt) Validate(data map[string]any) error {
-	return checkEntry(t.sv, t, data)
-}
-
-/* Type: Ceph Float */
-
-type CephFloat struct {
-	sv *SignatureVar
-}
-
-func (*CephFloat) TypeName() string { return "CephFloat" }
-
-func (t *CephFloat) Name() string { return t.sv.Name }
-
-func (t *CephFloat) Convert(v any) (any, error) {
-	switch vv := v.(type) {
-	case float64, float32:
-		return vv, nil
-	case string:
-		return strconv.ParseFloat(vv, 64)
-	}
-	return "", fmt.Errorf("not a CephFloat: %v", v)
-}
-
-func (t *CephFloat) Check(v any) error {
-	switch v.(type) {
-	case float64, float32:
-		return nil
-	}
-	return fmt.Errorf("not a float: %v (at %s)", v, t.sv.Name)
-}
-
-func (t *CephFloat) Set(data map[string]any, v any) error {
-	x, e := t.Convert(v)
-	return save(t.sv, data, x, e)
-}
-
-func (t *CephFloat) Validate(data map[string]any) error {
-	return checkEntry(t.sv, t, data)
-}
-
-/* Type: Ceph Bool */
-
-type CephBool struct {
-	sv *SignatureVar
-}
-
-func (*CephBool) TypeName() string { return "CephBool" }
-
-func (t *CephBool) Name() string { return t.sv.Name }
-
-func (t *CephBool) Convert(v any) (any, error) {
-	switch vv := v.(type) {
-	case bool:
-		return vv, nil
-	case string:
-		return strconv.ParseBool(vv)
-	}
-	return "", fmt.Errorf("not a CephBool: %v", v)
-}
-
-func (t *CephBool) Check(v any) error {
-	if _, ok := v.(bool); !ok {
-		return fmt.Errorf("not a bool: %v (at %s)", v, t.sv.Name)
-	}
-	return nil
-}
-
-func (t *CephBool) Set(data map[string]any, v any) error {
-	x, e := t.Convert(v)
-	return save(t.sv, data, x, e)
-}
-
-func (t *CephBool) Validate(data map[string]any) error {
-	return checkEntry(t.sv, t, data)
-}
-
-/* Type: Ceph Pool Name */
-
-type CephPoolName struct {
-	CephString
-}
-
-func (*CephPoolName) TypeName() string { return "CephPoolname" }
-
-/* Type: Ceph Object Name */
-
-type CephObjectName struct {
-	CephString
-}
-
-func (*CephObjectName) TypeName() string { return "CephObjectname" }
-
-/* Type: Ceph OSD Name */
-
-type CephOSDName struct {
-	CephString
-}
-
-func (*CephOSDName) TypeName() string { return "CephOsdName" }
-
-/* Type: Ceph PG ID */
-
-type CephPGID struct {
-	CephString
-}
-
-func (*CephPGID) TypeName() string { return "CephPgid" }
-
-/* Type: Unknown */
-
-type CephUnknownType struct {
-	sv *SignatureVar
-}
-
-func (*CephUnknownType) TypeName() string { return "(Unknown)" }
-
-func (t *CephUnknownType) Name() string { return t.sv.Name }
-
-func (t *CephUnknownType) Set(data map[string]any, v any) error {
-	return fmt.Errorf("Can not Set argument: Unknown Type: %s", t.sv.Type)
-}
-
-func (*CephUnknownType) Validate(data map[string]any) error {
-	return nil
-}
-
-type CephRepeatedArg struct {
-	inner CephScalarArgumentType
-	sv    *SignatureVar
-}
-
-func (t *CephRepeatedArg) TypeName() string {
-	return fmt.Sprintf("%s (Repeat: %s)", t.inner.TypeName(), t.sv.Repeat)
-}
-
-func (t *CephRepeatedArg) Name() string { return t.sv.Name }
-
-func (t *CephRepeatedArg) Set(data map[string]any, v any) error {
-	rval := reflect.ValueOf(v)
-	if rval.Kind() == reflect.Slice {
-		// is a slice
-		data[t.sv.Name] = []any{} // reset field
-		for i := 0; i < rval.Len(); i++ {
-			if err := t.Append(data, rval.Index(i)); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	return t.Append(data, v)
-}
-
-func (t *CephRepeatedArg) Append(data map[string]any, v any) error {
-	key := t.sv.Name
-	var temp []any
-	if _, ok := data[key]; !ok {
-		temp = []any{}
-	} else {
-		temp = data[key].([]any)
-	}
-	vv, err := t.inner.Convert(v)
-	if err != nil {
-		return err
-	}
-	data[key] = append(temp, vv)
-	return nil
-}
-
-func (t *CephRepeatedArg) Validate(data map[string]any) error {
-	if v, ok := data[t.sv.Name]; ok {
-		if vv, ok := v.([]any); ok {
-			for i := range vv {
-				if err := t.inner.Check(vv[i]); err != nil {
-					return nil
-				}
-			}
-		} else {
-			return fmt.Errorf("not a slice: %v (at %s)", v, t.sv.Name)
-		}
-	}
-	if t.sv.Required() {
-		return fmt.Errorf("missing required arg: %s", t.sv.Name)
-	}
-	return nil
-}
-
+// BindArgumentType returns a CephArgumentType bound to the given
+// SignatureVar.
 func BindArgumentType(sv *SignatureVar) CephArgumentType {
-	switch sv.Repeat {
-	case "N":
+	// go-ceph treats arguments with an "n" value as a special wrapper type
+	// rather teach all types how to deal with repeats all over the simpler
+	// types. We create an internal distinction between the regular types,
+	// deemed "scalar" types and the one non-scalar Repeat type.
+	if sv.Repeat == "N" {
 		inner := getScalarArgumentType(sv)
 		if st, ok := inner.(CephScalarArgumentType); ok {
 			return &CephRepeatedArg{st, sv}
@@ -438,48 +163,24 @@ func BindArgumentType(sv *SignatureVar) CephArgumentType {
 
 func getScalarArgumentType(sv *SignatureVar) CephArgumentType {
 	switch sv.Type {
-	case "CephString":
+	case CEPH_TYPE_STRING:
 		return &CephString{sv}
-	case "CephChoices":
+	case CEPH_TYPE_CHOICES:
 		return &CephChoices{sv}
-	case "CephInt":
+	case CEPH_TYPE_INT:
 		return &CephInt{sv}
-	case "CephFloat":
+	case CEPH_TYPE_FLOAT:
 		return &CephFloat{sv}
-	case "CephBool":
+	case CEPH_TYPE_BOOL:
 		return &CephBool{sv}
-	case "CephPoolname":
+	case CEPH_TYPE_POOL_NAME:
 		return &CephPoolName{CephString{sv}}
-	case "CephObjectname":
+	case CEPH_TYPE_OBJECT_NAME:
 		return &CephObjectName{CephString{sv}}
-	case "CephOsdName":
+	case CEPH_TYPE_OSD_NAME:
 		return &CephOSDName{CephString{sv}}
-	case "CephPgid":
+	case CEPH_TYPE_PG_ID:
 		return &CephPGID{CephString{sv}}
 	}
-	fmt.Printf("XXX: %v\n", sv.Type)
 	return &CephUnknownType{sv}
-}
-
-func save(
-	sv *SignatureVar, data map[string]any, v any, e error) error {
-	// ---
-	if e != nil {
-		return e
-	}
-	data[sv.Name] = v
-	return nil
-}
-
-func checkEntry(
-	sv *SignatureVar, t CephScalarArgumentType, data map[string]any) error {
-	// ---
-	v, ok := data[sv.Name]
-	if !ok {
-		if sv.Required() {
-			return fmt.Errorf("missing required arg: %s", sv.Name)
-		}
-		return nil
-	}
-	return t.Check(v)
 }
